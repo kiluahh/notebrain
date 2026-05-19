@@ -239,7 +239,7 @@ All Tavily tools require a **Tavily API key** (free tier available at [tavily.co
 
 ### Manual Installation
 
-1. Download `main.js`, `manifest.json`, and `styles.css` from the [latest release](https://github.com/user/notebrain/releases).
+1. Download `main.js`, `manifest.json`, and `styles.css` from the [latest release](https://github.com/kiluahh/notebrain/releases).
 2. Create a folder `notebrain` inside your vault's `.obsidian/plugins/` directory.
 3. Copy the three files into the `notebrain` folder.
 4. Restart Obsidian and enable the plugin in **Settings > Community Plugins**.
@@ -248,7 +248,7 @@ All Tavily tools require a **Tavily API key** (free tier available at [tavily.co
 
 1. Install the [BRAT](https://github.com/TfTHacker/obsidian42-brat) plugin.
 2. In BRAT settings, click **Add Beta Plugin**.
-3. Enter the repository URL: `https://github.com/user/notebrain`
+3. Enter the repository URL: `https://github.com/kiluahh/notebrain`
 4. Enable Notebrain in **Settings > Community Plugins**.
 
 ## Commands
