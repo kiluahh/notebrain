@@ -1,0 +1,1036 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Notebrain — AI Agent inside your Obsidian notes</title>
+<style>
+/* ===== CSS Custom Properties ===== */
+:root {
+  --bg-primary: #1a1a1f;
+  --bg-secondary: #23232a;
+  --bg-tertiary: #2a2a32;
+  --bg-hover: #30303a;
+  --bg-code: #1e1e28;
+  --border-color: #3a3a45;
+  --border-subtle: #2d2d38;
+  --text-primary: #e8e8ed;
+  --text-secondary: #b0b0bf;
+  --text-muted: #707080;
+  --accent: #8b5cf6;
+  --accent-light: #a78bfa;
+  --accent-glow: rgba(139, 92, 246, 0.15);
+  --accent-blue: #60a5fa;
+  --accent-green: #4ade80;
+  --accent-yellow: #fbbf24;
+  --accent-red: #f87171;
+  --accent-cyan: #22d3ee;
+  --accent-pink: #f472b6;
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.3);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.4);
+  --shadow-lg: 0 8px 30px rgba(0,0,0,0.5);
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --font-mono: 'Consolas', 'Monaco', 'Courier New', 'Fira Code', monospace;
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', 'Helvetica Neue', Arial, sans-serif;
+  --sidebar-width: 280px;
+  --header-height: 56px;
+  --max-content: 820px;
+}
+
+/* ===== Reset & Base ===== */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; font-size: 16px; }
+body {
+  font-family: var(--font-sans);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  line-height: 1.7;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+a { color: var(--accent-light); text-decoration: none; transition: color 0.15s; }
+a:hover { color: var(--accent); text-decoration: underline; }
+img { max-width: 100%; display: block; }
+code, pre { font-family: var(--font-mono); }
+code { font-size: 0.9em; background: var(--bg-code); padding: 0.15em 0.4em; border-radius: 4px; color: var(--accent-light); }
+pre { overflow-x: auto; border-radius: var(--radius-md); background: var(--bg-code); padding: 1.2em 1.4em; line-height: 1.6; font-size: 0.88em; }
+pre code { background: none; padding: 0; color: var(--text-primary); font-size: inherit; }
+
+/* ===== Layout ===== */
+.page-wrapper { display: flex; min-height: 100vh; }
+
+/* ===== Sidebar ===== */
+.sidebar {
+  position: fixed; top: 0; left: 0; bottom: 0; width: var(--sidebar-width);
+  background: var(--bg-secondary); border-right: 1px solid var(--border-color);
+  display: flex; flex-direction: column; z-index: 100; overflow: hidden;
+  transition: transform 0.3s ease;
+}
+.sidebar-brand {
+  display: flex; align-items: center; gap: 12px; padding: 18px 22px;
+  border-bottom: 1px solid var(--border-subtle); flex-shrink: 0;
+}
+.sidebar-logo {
+  width: 34px; height: 34px; background: linear-gradient(135deg, var(--accent), #6366f1);
+  border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: 18px; color: #fff;
+}
+.sidebar-brand-text { font-size: 1.2em; font-weight: 700; color: var(--text-primary); }
+.sidebar-brand-ver { font-size: 0.7em; color: var(--text-muted); margin-left: 6px; }
+.sidebar-nav {
+  flex: 1; overflow-y: auto; padding: 14px 0;
+  scrollbar-width: thin; scrollbar-color: var(--border-color) transparent;
+}
+.sidebar-nav::-webkit-scrollbar { width: 5px; }
+.sidebar-nav::-webkit-scrollbar-track { background: transparent; }
+.sidebar-nav::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 3px; }
+
+.nav-section { margin-bottom: 6px; }
+.nav-section-title {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 22px; font-size: 0.72em; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.06em; color: var(--text-muted); cursor: pointer; user-select: none;
+  transition: color 0.15s; border: none; background: none; width: 100%; text-align: left;
+  font-family: var(--font-sans);
+}
+.nav-section-title:hover { color: var(--text-secondary); }
+.nav-section-title .arrow { font-size: 0.8em; transition: transform 0.2s; }
+.nav-section.collapsed .arrow { transform: rotate(-90deg); }
+.nav-section.collapsed .nav-links { display: none; }
+
+.nav-links { list-style: none; }
+.nav-links li a {
+  display: block; padding: 6px 22px 6px 30px; font-size: 0.88em; color: var(--text-secondary);
+  border-left: 2px solid transparent; transition: all 0.15s;
+}
+.nav-links li a:hover { color: var(--text-primary); background: var(--bg-hover); text-decoration: none; }
+.nav-links li a.active {
+  color: var(--accent-light); background: var(--accent-glow); border-left-color: var(--accent);
+}
+
+/* ===== Mobile header (hamburger) ===== */
+.mobile-header {
+  display: none; position: fixed; top: 0; left: 0; right: 0; height: var(--header-height);
+  background: var(--bg-secondary); border-bottom: 1px solid var(--border-color);
+  align-items: center; padding: 0 18px; z-index: 99;
+}
+.mobile-header .brand { display: flex; align-items: center; gap: 10px; }
+.mobile-header .brand span { font-weight: 700; font-size: 1.05em; }
+.mobile-header .logo-sm {
+  width: 28px; height: 28px; background: linear-gradient(135deg, var(--accent), #6366f1);
+  border-radius: 5px; display: flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: 14px; color: #fff;
+}
+.hamburger {
+  display: flex; flex-direction: column; gap: 4px; cursor: pointer; margin-left: auto;
+  padding: 8px; background: none; border: none; z-index: 101;
+}
+.hamburger span { display: block; width: 20px; height: 2px; background: var(--text-primary); border-radius: 1px; transition: all 0.2s; }
+.hamburger.open span:nth-child(1) { transform: rotate(45deg) translate(4px, 4px); }
+.hamburger.open span:nth-child(2) { opacity: 0; }
+.hamburger.open span:nth-child(3) { transform: rotate(-45deg) translate(4px, -4px); }
+.sidebar-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 98; }
+
+/* ===== Main content ===== */
+.main-content {
+  flex: 1; margin-left: var(--sidebar-width); max-width: var(--max-content);
+  padding: 60px 48px 80px; width: calc(100% - var(--sidebar-width));
+}
+.content-inner { max-width: 100%; }
+
+.section { margin-bottom: 72px; scroll-margin-top: 30px; }
+.section:last-child { margin-bottom: 0; }
+
+h1 { font-size: 2.6em; font-weight: 800; line-height: 1.2; margin-bottom: 0.35em; letter-spacing: -0.02em; }
+h2 { font-size: 1.75em; font-weight: 700; margin-bottom: 0.6em; margin-top: 0; color: var(--text-primary); border-bottom: 2px solid var(--border-subtle); padding-bottom: 0.35em; }
+h3 { font-size: 1.25em; font-weight: 600; margin-bottom: 0.5em; margin-top: 1.5em; color: var(--text-primary); }
+h4 { font-size: 1.05em; font-weight: 600; margin-bottom: 0.4em; margin-top: 1.3em; color: var(--text-secondary); }
+p { margin-bottom: 1em; color: var(--text-secondary); }
+ul, ol { margin-bottom: 1em; padding-left: 1.4em; color: var(--text-secondary); }
+li { margin-bottom: 0.35em; }
+strong { color: var(--text-primary); font-weight: 600; }
+blockquote {
+  border-left: 3px solid var(--accent); background: var(--accent-glow);
+  padding: 0.8em 1.1em; margin: 1em 0; border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  color: var(--text-secondary); font-size: 0.95em;
+}
+blockquote p:last-child { margin-bottom: 0; }
+hr { border: none; border-top: 1px solid var(--border-subtle); margin: 2em 0; }
+
+/* ===== Hero ===== */
+.hero {
+  padding: 60px 0 50px; border-bottom: 1px solid var(--border-subtle); margin-bottom: 60px;
+}
+.hero .badge {
+  display: inline-block; padding: 4px 14px; border-radius: 20px; font-size: 0.78em;
+  font-weight: 600; background: var(--accent-glow); color: var(--accent-light);
+  margin-bottom: 20px; letter-spacing: 0.03em;
+}
+.hero h1 {
+  font-size: 3em; background: linear-gradient(135deg, #c4b5fd, #818cf8, #60a5fa);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text; margin-bottom: 0.2em;
+}
+.hero .tagline { font-size: 1.3em; color: var(--text-secondary); margin-bottom: 0.6em; font-weight: 500; }
+.hero .desc { font-size: 1.05em; color: var(--text-muted); max-width: 600px; line-height: 1.65; }
+.hero-actions { display: flex; gap: 12px; margin-top: 28px; flex-wrap: wrap; }
+.btn {
+  display: inline-flex; align-items: center; gap: 8px; padding: 10px 22px;
+  border-radius: var(--radius-sm); font-size: 0.9em; font-weight: 600; cursor: pointer;
+  transition: all 0.15s; text-decoration: none; border: none; font-family: var(--font-sans);
+}
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-primary:hover { background: #7c3aed; color: #fff; text-decoration: none; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(139,92,246,0.35); }
+.btn-outline { background: transparent; color: var(--text-primary); border: 1px solid var(--border-color); }
+.btn-outline:hover { background: var(--bg-hover); color: var(--text-primary); text-decoration: none; border-color: var(--text-muted); }
+
+/* ===== Quick start steps ===== */
+.steps { counter-reset: step; list-style: none; padding-left: 0; margin: 1.5em 0; }
+.steps li {
+  counter-increment: step; position: relative; padding-left: 52px; margin-bottom: 1.3em;
+  padding-top: 4px;
+}
+.steps li::before {
+  content: counter(step); position: absolute; left: 0; top: 0;
+  width: 34px; height: 34px; border-radius: 50%; background: var(--bg-tertiary);
+  border: 2px solid var(--border-color); display: flex; align-items: center;
+  justify-content: center; font-weight: 700; font-size: 0.9em; color: var(--accent-light);
+}
+
+/* ===== Code example block ===== */
+.code-example {
+  background: var(--bg-code); border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md); overflow: hidden; margin: 1.2em 0;
+}
+.code-example-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 16px; background: var(--bg-tertiary); border-bottom: 1px solid var(--border-subtle);
+  font-size: 0.78em; color: var(--text-muted);
+}
+.code-example-lang { font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
+.code-example-body { padding: 1.2em 1.4em; }
+.code-example-body pre { margin: 0; padding: 0; background: transparent; }
+
+/* Syntax highlighting */
+.syn-kw { color: #c084fc; }
+.syn-str { color: #86efac; }
+.syn-cmt { color: #6b7280; font-style: italic; }
+.syn-fn { color: #60a5fa; }
+.syn-num { color: #fbbf24; }
+.syn-op { color: #f472b6; }
+
+/* ===== Setting tables ===== */
+.setting-grid {
+  display: grid; grid-template-columns: 1fr;
+  gap: 1px; background: var(--border-subtle); border-radius: var(--radius-md);
+  overflow: hidden; border: 1px solid var(--border-subtle); margin: 1.2em 0;
+}
+.setting-row {
+  display: grid; grid-template-columns: 1fr 2fr; gap: 20px; padding: 14px 20px;
+  background: var(--bg-secondary); align-items: center;
+}
+.setting-row:nth-child(even) { background: var(--bg-tertiary); }
+.setting-name { font-weight: 600; color: var(--text-primary); font-size: 0.93em; }
+.setting-desc { font-size: 0.85em; color: var(--text-muted); }
+.setting-default { font-size: 0.75em; color: var(--accent-light); margin-top: 2px; }
+
+/* ===== Tool cards ===== */
+.tool-category { margin-bottom: 2em; }
+.tool-category-title {
+  font-size: 1em; font-weight: 700; color: var(--text-primary);
+  display: flex; align-items: center; gap: 8px; margin-bottom: 0.8em;
+}
+.tool-category-badge {
+  font-size: 0.72em; background: var(--bg-tertiary); color: var(--text-muted);
+  padding: 1px 10px; border-radius: 10px; font-weight: 500;
+}
+.tool-grid { display: grid; grid-template-columns: 1fr; gap: 8px; }
+.tool-card {
+  background: var(--bg-secondary); border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm); padding: 14px 18px; transition: border-color 0.15s;
+}
+.tool-card:hover { border-color: var(--border-color); }
+.tool-card-name {
+  font-weight: 600; font-family: var(--font-mono); font-size: 0.88em; color: var(--accent-light);
+  margin-bottom: 2px;
+}
+.tool-card-desc { font-size: 0.84em; color: var(--text-muted); }
+.tool-card-key {
+  display: inline-block; margin-top: 6px; font-size: 0.72em; padding: 2px 8px;
+  border-radius: 4px; background: var(--bg-tertiary); color: var(--accent-yellow);
+}
+
+/* ===== FAQ ===== */
+.faq-item {
+  border-bottom: 1px solid var(--border-subtle); padding: 20px 0;
+}
+.faq-item:first-child { padding-top: 0; }
+.faq-q { font-weight: 600; font-size: 1.02em; color: var(--text-primary); margin-bottom: 0.4em; cursor: default; }
+.faq-a { color: var(--text-secondary); font-size: 0.93em; }
+
+/* ===== Tags / chips ===== */
+.chip {
+  display: inline-flex; align-items: center; padding: 2px 10px;
+  border-radius: 4px; font-size: 0.75em; font-weight: 600; font-family: var(--font-mono);
+  background: var(--bg-tertiary); color: var(--accent-light);
+}
+.chip-green { color: var(--accent-green); }
+.chip-yellow { color: var(--accent-yellow); }
+.chip-red { color: var(--accent-red); }
+.chip-blue { color: var(--accent-blue); }
+
+/* ===== Footer ===== */
+.footer {
+  margin-top: 80px; padding-top: 30px; border-top: 1px solid var(--border-subtle);
+  display: flex; flex-wrap: wrap; gap: 30px; justify-content: space-between;
+  align-items: flex-start; font-size: 0.85em; color: var(--text-muted);
+}
+.footer a { color: var(--text-secondary); }
+.footer a:hover { color: var(--accent-light); }
+.footer-links { display: flex; gap: 20px; flex-wrap: wrap; }
+.footer-meta { display: flex; flex-direction: column; gap: 4px; }
+
+/* ===== Keybinding ===== */
+kbd {
+  display: inline-block; padding: 2px 8px; font-size: 0.84em; font-family: var(--font-mono);
+  background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 4px;
+  color: var(--text-primary); box-shadow: 0 1px 0 var(--border-color); font-weight: 500;
+}
+
+/* ===== Callout box ===== */
+.callout {
+  border-radius: var(--radius-md); padding: 16px 20px; margin: 1.2em 0;
+  border-left: 4px solid var(--accent); background: var(--accent-glow);
+}
+.callout-title { font-weight: 600; color: var(--accent-light); margin-bottom: 4px; font-size: 0.9em; }
+.callout-info { border-left-color: var(--accent-blue); background: rgba(96,165,250,0.08); }
+.callout-info .callout-title { color: var(--accent-blue); }
+.callout-warn { border-left-color: var(--accent-yellow); background: rgba(251,191,36,0.08); }
+.callout-warn .callout-title { color: var(--accent-yellow); }
+.callout p { margin-bottom: 0.3em; }
+
+/* ===== Tabs (for settings guide) ===== */
+.inline-tabs { display: flex; gap: 4px; margin-bottom: 1.2em; flex-wrap: wrap; }
+.inline-tab {
+  padding: 6px 16px; border-radius: var(--radius-sm); font-size: 0.84em; font-weight: 600;
+  cursor: pointer; border: 1px solid var(--border-color); background: var(--bg-secondary);
+  color: var(--text-secondary); transition: all 0.15s; font-family: var(--font-sans);
+}
+.inline-tab:hover { color: var(--text-primary); border-color: var(--text-muted); }
+.inline-tab.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+/* ===== Responsive ===== */
+@media (max-width: 900px) {
+  .sidebar { transform: translateX(-100%); }
+  .sidebar.open { transform: translateX(0); }
+  .sidebar-overlay.visible { display: block; }
+  .mobile-header { display: flex; }
+  .main-content { margin-left: 0; width: 100%; padding: 76px 22px 60px; }
+  .hero h1 { font-size: 2.2em; }
+  h2 { font-size: 1.4em; }
+  .setting-row { grid-template-columns: 1fr; gap: 4px; padding: 12px 16px; }
+}
+
+/* ===== Print ===== */
+@media print {
+  .sidebar, .mobile-header, .sidebar-overlay, .hamburger { display: none !important; }
+  .main-content { margin-left: 0; width: 100%; padding: 20px 0; }
+  body { background: #fff; color: #000; font-size: 13px; }
+  a { color: #000; }
+  pre { background: #f5f5f5; border: 1px solid #ddd; }
+  .hero h1 { -webkit-text-fill-color: #000; color: #000; background: none; }
+}
+
+/* ===== Scrollbar for main ===== */
+.main-content::-webkit-scrollbar { width: 6px; }
+.main-content::-webkit-scrollbar-track { background: transparent; }
+.main-content::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<!-- Mobile header -->
+<header class="mobile-header">
+  <div class="brand">
+    <div class="logo-sm">N</div>
+    <span>Notebrain</span>
+  </div>
+  <button class="hamburger" id="hamburger" aria-label="Toggle menu">
+    <span></span><span></span><span></span>
+  </button>
+</header>
+<div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+<!-- Sidebar -->
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-brand">
+    <div class="sidebar-logo">N</div>
+    <div>
+      <span class="sidebar-brand-text">Notebrain</span>
+      <span class="sidebar-brand-ver">v0.1.0</span>
+    </div>
+  </div>
+  <nav class="sidebar-nav">
+    <div class="nav-section">
+      <button class="nav-section-title" data-section="overview">
+        Overview <span class="arrow">&#9662;</span>
+      </button>
+      <ul class="nav-links">
+        <li><a href="#hero" data-section>Introduction</a></li>
+        <li><a href="#getting-started" data-section>Getting Started</a></li>
+      </ul>
+    </div>
+    <div class="nav-section">
+      <button class="nav-section-title" data-section="features">
+        Features <span class="arrow">&#9662;</span>
+      </button>
+      <ul class="nav-links">
+        <li><a href="#inline-chat" data-section>Inline Chat</a></li>
+        <li><a href="#fim-completion" data-section>FIM Completion</a></li>
+        <li><a href="#notebrain-md" data-section>NOTEBRAIN.md</a></li>
+      </ul>
+    </div>
+    <div class="nav-section">
+      <button class="nav-section-title" data-section="reference">
+        Reference <span class="arrow">&#9662;</span>
+      </button>
+      <ul class="nav-links">
+        <li><a href="#settings" data-section>Settings Guide</a></li>
+        <li><a href="#tools-reference" data-section>Tools Reference</a></li>
+        <li><a href="#faq" data-section>FAQ</a></li>
+      </ul>
+    </div>
+  </nav>
+</aside>
+
+<!-- Main content -->
+<main class="main-content">
+<div class="content-inner">
+
+  <!-- ===== HERO ===== -->
+  <section class="hero" id="hero">
+    <div class="badge">Obsidian Plugin</div>
+    <h1>Notebrain</h1>
+    <p class="tagline">AI Agent inside your Obsidian notes.</p>
+    <p class="desc">Chat with DeepSeek, search the web, manage your vault, research papers, and more — all from within any note. No context switching. No separate chat window. Your notes are the interface.</p>
+    <div class="hero-actions">
+      <a href="#getting-started" class="btn btn-primary">Get Started</a>
+      <a href="#tools-reference" class="btn btn-outline">Browse 21 Tools</a>
+    </div>
+  </section>
+
+  <!-- ===== GETTING STARTED ===== -->
+  <section class="section" id="getting-started">
+    <h2>Getting Started</h2>
+
+    <ol class="steps">
+      <li>
+        <strong>Install the plugin</strong><br>
+        Open Obsidian Settings &rarr; Community Plugins &rarr; Browse, search for <strong>Notebrain</strong>, and install. Alternatively, download the latest release from GitHub and place <code>main.js</code>, <code>manifest.json</code>, and <code>styles.css</code> in your vault's <code>.obsidian/plugins/notebrain/</code> folder.
+      </li>
+      <li>
+        <strong>Get a DeepSeek API key</strong><br>
+        Visit <a href="https://platform.deepseek.com" target="_blank" rel="noopener">platform.deepseek.com</a>, sign up, and create an API key. Paste it into the plugin settings under the <strong>Model</strong> tab.
+      </li>
+      <li>
+        <strong>Open any note and start chatting</strong><br>
+        Press <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>Enter</kbd> (Mac: <kbd>Cmd</kbd> + <kbd>Shift</kbd> + <kbd>Enter</kbd>) to open the inline chat input.
+      </li>
+      <li>
+        <strong>Type your message and press Enter</strong><br>
+        Your message is sent to DeepSeek. The AI streams its response directly into your note. Thinking content appears inside <code>%%</code> comment blocks.
+      </li>
+    </ol>
+  </section>
+
+  <!-- ===== INLINE CHAT ===== -->
+  <section class="section" id="inline-chat">
+    <h2>Inline Chat</h2>
+    <p>Notebrain's chat lives <strong>inside your notes</strong> using Obsidian's <code>%%</code> comment markers for thinking content and tool calls. There is no separate chat panel — your note is both the input and output surface.</p>
+
+    <h3>How It Works</h3>
+    <ol>
+      <li>Place your cursor in any markdown note and press <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>Enter</kbd>.</li>
+      <li>An input prompt appears at the bottom of the note. Type your message.</li>
+      <li>The plugin writes a header to the file, then streams the AI response <strong>directly to the file</strong> in 80ms batches (configurable).</li>
+      <li>Thinking/reasoning content appears inside <code>%%...%%</code> comment blocks — invisible in reading mode, visible in source/live preview.</li>
+      <li>Tool calls are displayed in the thinking block. Tool results are passed to the AI but not written to the note (keeps the note clean).</li>
+      <li>When the AI produces a real response, the <code>%%</code> block closes and the message appears as normal text.</li>
+    </ol>
+
+    <h3>Chat Format</h3>
+    <div class="code-example">
+      <div class="code-example-header">
+        <span class="code-example-lang">Note Content</span>
+      </div>
+      <div class="code-example-body"><pre><code><span class="syn-cmt">%%</span>
+<span class="syn-cmt">user</span>
+<span class="syn-cmt">[Timestamp: 2026-05-19 14:30:00 +08:00]</span>
+<span class="syn-cmt">%%</span>
+
+What are the key ideas in quantum computing?
+
+<span class="syn-cmt">%%</span>
+<span class="syn-cmt">[Thinking]</span>
+<span class="syn-cmt">Let me break down quantum computing into its</span>
+<span class="syn-cmt">fundamental concepts: superposition, entanglement,</span>
+<span class="syn-cmt">and interference...</span>
+<span class="syn-cmt">[Tool call: searchNotes {query:"quantum computing"}]</span>
+<span class="syn-cmt">%%</span>
+
+Quantum computing leverages three core principles:
+
+1. <span class="syn-kw">Superposition</span>: Qubits exist in multiple states...
+2. <span class="syn-kw">Entanglement</span>: Correlated qubits share state...
+3. <span class="syn-kw">Interference</span>: Wave-like probability manipulation...
+
+<span class="syn-cmt">%%</span>
+<span class="syn-cmt">assistant</span>
+<span class="syn-cmt">[Timestamp: 2026-05-19 14:32:15 +08:00]</span>
+<span class="syn-cmt">%%</span></code></pre></div>
+    </div>
+
+    <h3>Key Behaviors</h3>
+    <ul>
+      <li><strong>Unified file-only streaming:</strong> All content is written through <code>vault.modify()</code>. The file is the single source of truth, eliminating race conditions.</li>
+      <li><strong>30-minute chat cache:</strong> Full API-native messages (with tool calls and reasoning) are cached in memory. Within the 30-minute window, subsequent messages reuse the cache for efficiency.</li>
+      <li><strong>Tool permission modal:</strong> Destructive operations like <code>createNote</code> and <code>editNote</code> show a confirmation dialog before execution.</li>
+      <li><strong>Session tags:</strong> After each chat session, <code>#notebrain-session</code> is automatically added to the note's frontmatter tags.</li>
+    </ul>
+
+    <div class="callout callout-info">
+      <div class="callout-title">Tip</div>
+      <p>You can also trigger inline chat by clicking the brain icon in the left ribbon, or via the command palette (<code>Notebrain: Chat</code>).</p>
+    </div>
+  </section>
+
+  <!-- ===== FIM COMPLETION ===== -->
+  <section class="section" id="fim-completion">
+    <h2>FIM Completion</h2>
+    <p>Fill-in-the-Middle (FIM) lets you insert a <code>+++</code> marker anywhere in your note and have the AI generate text to fill the gap between the content above (prefix) and below (suffix).</p>
+
+    <h3>Usage</h3>
+    <ol>
+      <li>Place <code>+++</code> on its own line at the position where you want AI-generated content.</li>
+      <li>Place your cursor on that line.</li>
+      <li>Trigger FIM from the ribbon (pen icon) or command palette (<code>Notebrain: FIM Complete</code>).</li>
+      <li>The AI fills the gap and replaces the <code>+++</code> marker with the generated text.</li>
+    </ol>
+
+    <h3>Custom Token Count</h3>
+    <p>Append a number to the marker to set a custom max token count for that specific completion:</p>
+    <div class="code-example">
+      <div class="code-example-header"><span class="code-example-lang">Prefix/content above the marker</span></div>
+      <div class="code-example-body"><pre><code>Chapter 1: The Beginning
+
+The old library stood silent...
+
+<span class="syn-kw">+++512</span>
+
+Chapter 3 would reveal the truth.</code></pre></div>
+    </div>
+    <p>Here, <code>+++512</code> requests up to 512 tokens to bridge the gap. The default is 1024 tokens (configurable in FIM settings). The FIM API has its own dedicated settings — separate API key, base URL, model, temperature, and max tokens — independent of the chat model configuration.</p>
+
+    <div class="callout">
+      <div class="callout-title">How FIM works</div>
+      <p>The text above <code>+++</code> becomes the <strong>prefix</strong> and the text below becomes the <strong>suffix</strong>. The model generates content that fits naturally between them. If there is no text after <code>+++</code>, the model does suffix-only completion (continuation).</p>
+    </div>
+  </section>
+
+  <!-- ===== NOTEBRAIN.MD ===== -->
+  <section class="section" id="notebrain-md">
+    <h2>NOTEBRAIN.md</h2>
+    <p><strong>NOTEBRAIN.md</strong> is a vault-wide AI instructions file, similar to <code>CLAUDE.md</code> or <code>AGENTS.md</code>. It is automatically created in your vault root on first load if it does not exist. The path is configurable in settings.</p>
+
+    <p>Use NOTEBRAIN.md to set rules, preferences, and context that the AI follows across <strong>all</strong> your notes. The content is injected into the system prompt at the start of every chat session.</p>
+
+    <h3>Example NOTEBRAIN.md</h3>
+    <div class="code-example">
+      <div class="code-example-header"><span class="code-example-lang">NOTEBRAIN.md</span></div>
+      <div class="code-example-body"><pre><code><span class="syn-cmt"># NOTEBRAIN.md</span>
+
+<span class="syn-cmt">## AI Behavior Rules</span>
+- <span class="syn-kw">Language:</span> Always respond in <span class="syn-str">English</span> unless the user writes in Chinese.
+- <span class="syn-kw">Style:</span> Be concise. Prefer bullet points over long paragraphs.
+- <span class="syn-kw">Tone:</span> Professional but friendly. Avoid marketing fluff.
+
+<span class="syn-cmt">## Vault Structure</span>
+- <span class="syn-str">/Projects/</span> — active project notes (do not create here unless asked)
+- <span class="syn-str">/Archive/</span> — completed/archived content
+- <span class="syn-str">/Daily/</span> — daily journal entries (template: <span class="syn-str">YYYY-MM-DD.md</span>)
+- <span class="syn-str">/References/</span> — reference material, wiki-style notes
+
+<span class="syn-cmt">## Preferences</span>
+- When creating notes, use the <span class="syn-str">Daily</span> template.
+- Do not create notes in the root folder.
+- Use wikilinks for cross-references.</code></pre></div>
+    </div>
+
+    <p>You can also store NOTEBRAIN.md in a subfolder (e.g., <code>Config/NOTEBRAIN.md</code>) — just update the path in settings. The plugin auto-discovers any file named "notebrain" (case-insensitive) in your vault and offers them in a dropdown.</p>
+  </section>
+
+  <!-- ===== SETTINGS GUIDE ===== -->
+  <section class="section" id="settings">
+    <h2>Settings Guide</h2>
+    <p>Notebrain settings are organized into <strong>five tabs</strong>. Open them via <em>Settings &rarr; Community Plugins &rarr; Notebrain &rarr; gear icon</em>.</p>
+
+    <div class="inline-tabs" id="settingsTabs">
+      <button class="inline-tab active" data-tab="tab-basic">Basic</button>
+      <button class="inline-tab" data-tab="tab-model">Model</button>
+      <button class="inline-tab" data-tab="tab-tools">Tools</button>
+      <button class="inline-tab" data-tab="tab-note">Note</button>
+      <button class="inline-tab" data-tab="tab-fim">FIM</button>
+    </div>
+
+    <!-- Basic Tab -->
+    <div class="tab-content" id="tab-basic">
+      <h3>Basic</h3>
+      <p>General plugin configuration — language, instruction file path, and streaming behavior.</p>
+      <div class="setting-grid">
+        <div class="setting-row">
+          <div><div class="setting-name">Language</div><div class="setting-desc">Settings UI display language.</div></div>
+          <div><div class="setting-desc">Options: <strong>Chinese (zh)</strong> or <strong>English (en)</strong>. Affects settings labels, tool names, and descriptions in the settings UI. Does not affect AI output language — control that via NOTEBRAIN.md.</div><div class="setting-default">Default: zh</div></div>
+        </div>
+        <div class="setting-row">
+          <div><div class="setting-name">NOTEBRAIN.md Path</div><div class="setting-desc">Where the AI instructions file is stored.</div></div>
+          <div><div class="setting-desc">Dropdown lists all markdown files named "notebrain" (case-insensitive) in your vault. The root <code>NOTEBRAIN.md</code> is always available as the first option. Contents are injected into the system prompt.</div><div class="setting-default">Default: NOTEBRAIN.md (root)</div></div>
+        </div>
+        <div class="setting-row">
+          <div><div class="setting-name">Write Frequency</div><div class="setting-desc">Milliseconds between file writes during streaming.</div></div>
+          <div><div class="setting-desc">Controls how often the AI response is flushed to disk during streaming. Lower values = smoother display but higher CPU usage. Must be between 20–500ms.</div><div class="setting-default">Default: 80ms</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Model Tab -->
+    <div class="tab-content" id="tab-model" style="display:none;">
+      <h3>Model</h3>
+      <p>API connection and model behavior settings for the chat agent.</p>
+      <div class="setting-grid">
+        <div class="setting-row">
+          <div><div class="setting-name">API Key</div><div class="setting-desc">DeepSeek API key for authentication.</div></div>
+          <div><div class="setting-desc">Get your key from <a href="https://platform.deepseek.com" target="_blank" rel="noopener">platform.deepseek.com</a>. Stored locally in your Obsidian data folder — never sent anywhere except to the configured base URL.</div><div class="setting-default">Required</div></div>
+        </div>
+        <div class="setting-row">
+          <div><div class="setting-name">Base URL</div><div class="setting-desc">API endpoint address.</div></div>
+          <div><div class="setting-desc">Default points to DeepSeek's official API. Change this to use OpenAI-compatible endpoints (e.g., local LLM servers, proxies, or other providers).</div><div class="setting-default">Default: https://api.deepseek.com</div></div>
+        </div>
+        <div class="setting-row">
+          <div><div class="setting-name">Model</div><div class="setting-desc">Model identifier string.</div></div>
+          <div><div class="setting-desc">Text input with available-models discovery. The plugin attempts to fetch the model list from the API on settings load and shows available models inline. Supports any DeepSeek model and OpenAI-compatible models.</div><div class="setting-default">Default: deepseek-v4-pro</div></div>
+        </div>
+        <div class="setting-row">
+          <div><div class="setting-name">Thinking Mode</div><div class="setting-desc">Enable reasoning/thinking output.</div></div>
+          <div><div class="setting-desc">When enabled, the model outputs its reasoning process inside <code>%%...%%</code> comment blocks. Thinking content is hidden in reading mode but visible in source/live preview. <strong>Crucial:</strong> reasoning content must be passed back in subsequent messages after tool calls, or the API returns a 400 error — the cache handles this automatically for warm starts.</div><div class="setting-default">Default: On</div></div>
+        </div>
+        <div class="setting-row">
+          <div><div class="setting-name">Reasoning Effort</div><div class="setting-desc">Thinking intensity level.</div></div>
+          <div><div class="setting-desc">Dropdown: <strong>high</strong> or <strong>max</strong>. Higher effort produces more thorough reasoning but takes longer and uses more tokens. Only applies when Thinking Mode is on.</div><div class="setting-default">Default: high</div></div>
+        </div>
+        <div class="setting-row">
+          <div><div class="setting-name">Temperature</div><div class="setting-desc">Creativity level (0–2).</div></div>
+          <div><div class="setting-desc">Controls randomness in output. Lower = more focused/deterministic. Higher = more creative/varied. <strong>Only applies when Thinking Mode is off.</strong></div><div class="setting-default">Default: 0.7</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tools Tab -->
+    <div class="tab-content" id="tab-tools" style="display:none;">
+      <h3>Tools</h3>
+      <p>API keys for external services and per-tool enable/disable toggles.</p>
+
+      <h4>External API Keys</h4>
+      <div class="setting-grid">
+        <div class="setting-row">
+          <div><div class="setting-name">Tavily API Key</div></div>
+          <div><div class="setting-desc">Required for Tavily web search, extract, crawl, map, and research tools. Get one at <a href="https://tavily.com" target="_blank" rel="noopener">tavily.com</a>. Format: <code>tvly-...</code></div></div>
+        </div>
+        <div class="setting-row">
+          <div><div class="setting-name">GitHub Token</div></div>
+          <div><div class="setting-desc">Optional personal access token for higher API rate limits when using <code>githubSearch</code>. Create at <a href="https://github.com/settings/tokens" target="_blank" rel="noopener">github.com/settings/tokens</a>. Format: <code>ghp_...</code></div></div>
+        </div>
+        <div class="setting-row">
+          <div><div class="setting-name">Baidu AppBuilder Key</div></div>
+          <div><div class="setting-desc">Required for <code>baiduBaike</code> (Baidu Encyclopedia) lookups. Get one at <a href="https://appbuilder.baidu.com" target="_blank" rel="noopener">appbuilder.baidu.com</a>. Format: <code>bce-...</code></div></div>
+        </div>
+        <div class="setting-row">
+          <div><div class="setting-name">Headless Browser Endpoint</div></div>
+          <div><div class="setting-desc">Optional custom headless browser endpoint for <code>webFetch</code> with <code>renderJs=true</code>. If left empty, the built-in free renderer (Jina AI) is used.</div></div>
+        </div>
+      </div>
+
+      <h4>Tool Toggles (21 Tools)</h4>
+      <p>Each tool has an individual enable/disable toggle. Disabled tools are hidden from the AI — it cannot see or call them. Toggle off tools you do not use to reduce token usage in the system prompt.</p>
+    </div>
+
+    <!-- Note Tab -->
+    <div class="tab-content" id="tab-note" style="display:none;">
+      <h3>Note</h3>
+      <p>Controls for note creation, editing permissions, and templates.</p>
+      <div class="setting-grid">
+        <div class="setting-row">
+          <div><div class="setting-name">Enable YAML</div><div class="setting-desc">Allow AI to create notes with YAML frontmatter.</div></div>
+          <div><div class="setting-desc">When off, the AI is forbidden from creating notes with YAML frontmatter. Any frontmatter in generated content is automatically stripped before writing.</div><div class="setting-default">Default: On</div></div>
+        </div>
+        <div class="setting-row">
+          <div><div class="setting-name">Edit Permission Tag</div><div class="setting-desc">Tag required for AI to edit a note.</div></div>
+          <div><div class="setting-desc">Only notes containing this tag (in body or frontmatter) can be edited by the AI via <code>createNote</code> and <code>editNote</code>. Auto-prepends <code>#</code> if you forget it. Change this to restrict AI editing to specific notes only.</div><div class="setting-default">Default: #notebrain</div></div>
+        </div>
+        <div class="setting-row">
+          <div><div class="setting-name">Note Template</div><div class="setting-desc">Template note for new note creation.</div></div>
+          <div><div class="setting-desc">Dropdown lists all markdown files in your vault. When set, newly created notes (via <code>createNote</code>) will be based on the selected template's structure. Leave empty for no template.</div><div class="setting-default">Default: (none)</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- FIM Tab -->
+    <div class="tab-content" id="tab-fim" style="display:none;">
+      <h3>FIM</h3>
+      <p>Separate API configuration for Fill-in-the-Middle completion. FIM settings are completely independent from the chat model settings — you can use a different API key, endpoint, or model.</p>
+
+      <h4>API Settings</h4>
+      <div class="setting-grid">
+        <div class="setting-row">
+          <div><div class="setting-name">API Key</div></div>
+          <div><div class="setting-desc">FIM-specific API key. Leave empty to use the Model tab's API key.</div></div>
+        </div>
+        <div class="setting-row">
+          <div><div class="setting-name">Base URL</div></div>
+          <div><div class="setting-desc">FIM API endpoint. <code>/beta</code> is automatically appended. Uses a separate base URL from the chat model.</div><div class="setting-default">Default: https://api.deepseek.com</div></div>
+        </div>
+        <div class="setting-row">
+          <div><div class="setting-name">Model</div></div>
+          <div><div class="setting-desc">Model for FIM completions. Leave empty to use the Model tab's model.</div><div class="setting-default">Default: deepseek-v4-pro</div></div>
+        </div>
+      </div>
+
+      <h4>Parameters</h4>
+      <div class="setting-grid">
+        <div class="setting-row">
+          <div><div class="setting-name">Temperature</div></div>
+          <div><div class="setting-desc">Creativity level for FIM completions (0–2). Lower values produce more focused, deterministic output.</div><div class="setting-default">Default: 1.0</div></div>
+        </div>
+        <div class="setting-row">
+          <div><div class="setting-name">Max Tokens</div></div>
+          <div><div class="setting-desc">Default maximum completion length (1–4096). Can be overridden per-marker with <code>+++N</code> syntax.</div><div class="setting-default">Default: 1024</div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== TOOLS REFERENCE ===== -->
+  <section class="section" id="tools-reference">
+    <h2>Tools Reference</h2>
+    <p>Notebrain ships with <strong>21 tools</strong> across six categories. The AI decides which tools to call based on your message. You can call multiple tools in parallel when they are independent.</p>
+
+    <!-- Vault -->
+    <div class="tool-category">
+      <h4 class="tool-category-title">
+        <span class="chip">Vault</span>
+        <span class="tool-category-badge">6 tools</span>
+      </h4>
+      <div class="tool-grid">
+        <div class="tool-card">
+          <div class="tool-card-name">searchNotes</div>
+          <div class="tool-card-desc">Search the entire vault — content, tags, filename, path, properties, and regex. Returns matched notes with snippets.</div>
+        </div>
+        <div class="tool-card">
+          <div class="tool-card-name">readNote</div>
+          <div class="tool-card-desc">Read a note by name or path. Returns full content, metadata, wikilinks, and heading structure.</div>
+        </div>
+        <div class="tool-card">
+          <div class="tool-card-name">listFolder</div>
+          <div class="tool-card-desc">List folder contents (files, subfolders). Useful for browsing vault structure and discovering notes.</div>
+        </div>
+        <div class="tool-card">
+          <div class="tool-card-name">getBacklinks</div>
+          <div class="tool-card-desc">Get all notes that link to a given note. Essential for understanding relationships in your knowledge graph.</div>
+        </div>
+        <div class="tool-card">
+          <div class="tool-card-name">createNote</div>
+          <div class="tool-card-desc">Create a new note at a specified path. Requires user confirmation via modal. Respects note template setting.</div>
+          <div class="tool-card-key">Requires: edit permission tag</div>
+        </div>
+        <div class="tool-card">
+          <div class="tool-card-name">editNote</div>
+          <div class="tool-card-desc">Edit an existing note — replace, append, or prepend content. Requires user confirmation via modal.</div>
+          <div class="tool-card-key">Requires: edit permission tag</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Time -->
+    <div class="tool-category">
+      <h4 class="tool-category-title">
+        <span class="chip chip-green">Time</span>
+        <span class="tool-category-badge">1 tool</span>
+      </h4>
+      <div class="tool-grid">
+        <div class="tool-card">
+          <div class="tool-card-name">getCurrentTime</div>
+          <div class="tool-card-desc">Get the current date and time with timezone support. Returns ISO 8601 formatted timestamp.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Web Free -->
+    <div class="tool-category">
+      <h4 class="tool-category-title">
+        <span class="chip chip-blue">Web Free</span>
+        <span class="tool-category-badge">3 tools</span>
+      </h4>
+      <div class="tool-grid">
+        <div class="tool-card">
+          <div class="tool-card-name">webSearch</div>
+          <div class="tool-card-desc">Free web search using Baidu + Bing. Requires at least 3 keywords, searches both engines per keyword. No API key needed.</div>
+        </div>
+        <div class="tool-card">
+          <div class="tool-card-name">webFetch</div>
+          <div class="tool-card-desc">Fetch and extract readable content from any URL. Supports <code>renderJs=true</code> for JavaScript-heavy pages via built-in free renderer (Jina AI) or custom headless browser endpoint.</div>
+        </div>
+        <div class="tool-card">
+          <div class="tool-card-name">cnNews</div>
+          <div class="tool-card-desc">Aggregate headlines from 23 major Chinese news sites (Xinhua, People's Daily, CCTV, etc.). Optional <code>tier</code> parameter for filtering by importance.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tavily -->
+    <div class="tool-category">
+      <h4 class="tool-category-title">
+        <span class="chip chip-yellow">Tavily</span>
+        <span class="tool-category-badge">6 tools</span>
+        <span class="tool-card-key">Requires: Tavily API Key</span>
+      </h4>
+      <div class="tool-grid">
+        <div class="tool-card">
+          <div class="tool-card-name">tavilySearch</div>
+          <div class="tool-card-desc">Search the web with configurable depth (basic/advanced), topic filtering, and domain include/exclude lists.</div>
+        </div>
+        <div class="tool-card">
+          <div class="tool-card-name">tavilyExtract</div>
+          <div class="tool-card-desc">Extract clean, structured content from one or more URLs. Returns markdown or text with advanced extraction for tables.</div>
+        </div>
+        <div class="tool-card">
+          <div class="tool-card-name">tavilyCrawl</div>
+          <div class="tool-card-desc">Crawl a website starting from a URL with configurable depth and breadth. Follows links and extracts content.</div>
+        </div>
+        <div class="tool-card">
+          <div class="tool-card-name">tavilyMap</div>
+          <div class="tool-card-desc">Map a website's structure. Returns a list of all URLs discovered starting from a base URL. Good for site exploration.</div>
+        </div>
+        <div class="tool-card">
+          <div class="tool-card-name">tavilyResearch</div>
+          <div class="tool-card-desc">Multi-step deep research on any topic. Polls for up to 3 minutes. Returns a comprehensive research report.</div>
+        </div>
+        <div class="tool-card">
+          <div class="tool-card-name">tavilyResearchGet</div>
+          <div class="tool-card-desc">Retrieve a completed Tavily deep research report by its <code>request_id</code>.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Academic -->
+    <div class="tool-category">
+      <h4 class="tool-category-title">
+        <span class="chip chip-red">Academic</span>
+        <span class="tool-category-badge">4 tools</span>
+      </h4>
+      <div class="tool-grid">
+        <div class="tool-card">
+          <div class="tool-card-name">githubSearch</div>
+          <div class="tool-card-desc">Search GitHub repositories, code, issues, and users. Works without a token. Optional token for higher rate limits.</div>
+        </div>
+        <div class="tool-card">
+          <div class="tool-card-name">arxivSearch</div>
+          <div class="tool-card-desc">Search arXiv preprints with full search_query syntax (e.g., <code>cat:cs.LG AND ti:diffusion</code>). Returns titles, authors, abstracts. Shared 3-second rate limit with arxivDownload.</div>
+        </div>
+        <div class="tool-card">
+          <div class="tool-card-name">arxivDownload</div>
+          <div class="tool-card-desc">Download paper as HTML preview (for reading) or PDF. Files saved to vault root. Shared 3-second rate limit with arxivSearch.</div>
+        </div>
+        <div class="tool-card">
+          <div class="tool-card-name">wikipedia</div>
+          <div class="tool-card-desc">Search Wikipedia or get full article content. Supports multiple languages (<code>lang</code> parameter). No API key required.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Reference -->
+    <div class="tool-category">
+      <h4 class="tool-category-title">
+        <span class="chip chip-yellow">Reference</span>
+        <span class="tool-category-badge">1 tool</span>
+      </h4>
+      <div class="tool-grid">
+        <div class="tool-card">
+          <div class="tool-card-name">baiduBaike</div>
+          <div class="tool-card-desc">Query Baidu Encyclopedia (Baidu Baike) entries by title or ID. Returns structured encyclopedia content in Chinese.</div>
+          <div class="tool-card-key">Requires: Baidu AppBuilder Key</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== FAQ ===== -->
+  <section class="section" id="faq">
+    <h2>FAQ</h2>
+
+    <div class="faq-item">
+      <div class="faq-q">Is Notebrain free?</div>
+      <div class="faq-a">
+        The plugin is free and open source (MIT). However, the AI features require a <strong>DeepSeek API key</strong>, which is a paid service. DeepSeek's pricing is competitive — typically a fraction of the cost of other major AI providers. Some tools (webSearch, webFetch, cnNews, githubSearch, arxivSearch, arxivDownload, wikipedia) work without additional API keys.
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q">Does it work on mobile?</div>
+      <div class="faq-a">
+        <strong>Yes.</strong> Notebrain is fully mobile-compatible (Obsidian Android and iOS). It uses vanilla DOM only (no React), <code>requestUrl</code> instead of <code>fetch</code> (required by Obsidian's CSP on mobile), and pauses file writes during tool execution to avoid single-threaded I/O deadlocks on mobile devices. The <code>isDesktopOnly</code> flag in the manifest is set to <code>false</code>.
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q">What models are supported?</div>
+      <div class="faq-a">
+        Any DeepSeek model — <strong>deepseek-v4-pro</strong>, <strong>deepseek-v4-flash</strong>, and future models. Because the plugin uses the OpenAI-compatible chat completions API, you can point the Base URL to <strong>any OpenAI-compatible endpoint</strong> — including local models (Ollama, LM Studio), proxies, or other providers. The model list is auto-discovered from your configured endpoint.
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q">Can the AI edit my notes?</div>
+      <div class="faq-a">
+        <strong>Yes, with permission.</strong> The <code>createNote</code> and <code>editNote</code> tools can modify your vault, but they require two levels of protection: (1) the target note must contain the edit permission tag (<code>#notebrain</code> by default, configurable), and (2) a confirmation modal appears before any destructive operation. You can disable these tools entirely from the Tools tab if you prefer.
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q">Is my data private?</div>
+      <div class="faq-a">
+        Your API key is stored <strong>locally</strong> in Obsidian's data folder and is never sent anywhere except to your configured Base URL. The content of your messages is sent to the DeepSeek API (or your configured endpoint) for processing. Review DeepSeek's privacy policy for details on how they handle API data. Note content is only read when explicitly requested (search, read, edit tools) and only within your vault.
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q">What is the chat cache and how does it work?</div>
+      <div class="faq-a">
+        Notebrain maintains a <strong>30-minute in-memory cache</strong> per file. Full API-native messages (with tool calls, tool results, and reasoning content) are stored so that when you send a follow-up message within 30 minutes, the plugin can reconstruct the full conversation context without re-parsing the entire note. If the cache expires, the plugin rebuilds context from the note's user and assistant messages (without thinking history, which is not needed for new turns). The cache resets on each new message within the window.
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q">Why does the plugin use %% comments for thinking content?</div>
+      <div class="faq-a">
+        Obsidian's <code>%%...%%</code> syntax creates <strong>comments</strong> — content that is visible in source/live preview mode but <strong>hidden in reading mode</strong>. This keeps your notes clean and readable while still preserving the AI's reasoning trace for debugging or review. The thinking content is also required by the DeepSeek API: when thinking mode is on, <code>reasoning_content</code> must be passed back in subsequent messages after tool calls, or the API returns a 400 error.
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== FOOTER ===== -->
+  <footer class="footer">
+    <div class="footer-meta">
+      <span><strong>Notebrain</strong> v0.1.0</span>
+      <span>by <strong>kiluahh</strong></span>
+      <span>Licensed under MIT</span>
+    </div>
+    <div class="footer-links">
+      <a href="https://github.com" target="_blank" rel="noopener">GitHub Repository</a>
+      <a href="https://github.com" target="_blank" rel="noopener">Report an Issue</a>
+      <a href="https://platform.deepseek.com" target="_blank" rel="noopener">DeepSeek Platform</a>
+      <a href="https://tavily.com" target="_blank" rel="noopener">Tavily Search API</a>
+    </div>
+  </footer>
+
+</div>
+</main>
+
+<!-- JavaScript -->
+<script>
+(function() {
+  'use strict';
+
+  // ===== Mobile sidebar toggle =====
+  var sidebar = document.getElementById('sidebar');
+  var overlay = document.getElementById('sidebarOverlay');
+  var hamburger = document.getElementById('hamburger');
+
+  function openSidebar() {
+    sidebar.classList.add('open');
+    overlay.classList.add('visible');
+    hamburger.classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeSidebar() {
+    sidebar.classList.remove('open');
+    overlay.classList.remove('visible');
+    hamburger.classList.remove('open');
+    document.body.style.overflow = '';
+  }
+
+  hamburger.addEventListener('click', function() {
+    if (sidebar.classList.contains('open')) { closeSidebar(); }
+    else { openSidebar(); }
+  });
+
+  overlay.addEventListener('click', closeSidebar);
+
+  // Close sidebar when a nav link is clicked (mobile)
+  var navLinks = document.querySelectorAll('.nav-links li a');
+  navLinks.forEach(function(link) {
+    link.addEventListener('click', function() {
+      if (window.innerWidth <= 900) { closeSidebar(); }
+    });
+  });
+
+  // ===== Collapsible sidebar sections =====
+  document.querySelectorAll('.nav-section-title').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      this.parentElement.classList.toggle('collapsed');
+    });
+  });
+
+  // ===== Scroll spy (Intersection Observer) =====
+  var sections = document.querySelectorAll('.section, .hero');
+  var observerOptions = { rootMargin: '-80px 0px -70% 0px', threshold: 0 };
+
+  var observer = new IntersectionObserver(function(entries) {
+    entries.forEach(function(entry) {
+      if (entry.isIntersecting) {
+        var id = entry.target.id;
+        document.querySelectorAll('.nav-links li a').forEach(function(a) {
+          a.classList.remove('active');
+          if (a.getAttribute('href') === '#' + id) {
+            a.classList.add('active');
+          }
+        });
+      }
+    });
+  }, observerOptions);
+
+  sections.forEach(function(s) { observer.observe(s); });
+
+  // ===== Settings tab switcher =====
+  var tabButtons = document.querySelectorAll('#settingsTabs .inline-tab');
+  tabButtons.forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var tabId = this.getAttribute('data-tab');
+      // Deactivate all
+      tabButtons.forEach(function(b) { b.classList.remove('active'); });
+      document.querySelectorAll('#settings .tab-content').forEach(function(p) {
+        p.style.display = 'none';
+      });
+      // Activate target
+      this.classList.add('active');
+      var panel = document.getElementById(tabId);
+      if (panel) { panel.style.display = 'block'; }
+    });
+  });
+
+})();
+</script>
+
+</body>
+</html>
