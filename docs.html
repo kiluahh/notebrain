@@ -69,6 +69,47 @@ body::before {
     rgba(0,0,0,0.06) 4px
   );
 }
+n	/* ============================================================
+	   Three.js 3D Background
+	   ============================================================ */
+	#three-container {
+	  position: fixed; inset: 0;
+	  z-index: 0;
+	}
+	#particle-canvas {
+	  position: fixed; inset: 0;
+	  z-index: 1;
+	  pointer-events: none;
+	}
+	#glow {
+	  position: fixed;
+	  width: 300px; height: 300px;
+	  border-radius: 50%;
+	  background: radial-gradient(circle, rgba(0,245,255,0.1), transparent 70%);
+	  pointer-events: none;
+	  z-index: 1;
+	  transform: translate(-50%, -50%);
+	  opacity: 0;
+	  transition: opacity 0.3s;
+	}
+	@keyframes glitch {
+	  0% { clip-path: inset(40% 0 61% 0); transform: translate(-2px,2px); }
+	  10% { clip-path: inset(92% 0 1% 0); transform: translate(1px,-3px); }
+	  20% { clip-path: inset(43% 0 1% 0); transform: translate(-3px,1px); }
+	  30% { clip-path: inset(25% 0 58% 0); transform: translate(3px,2px); }
+	  40% { clip-path: inset(70% 0 10% 0); transform: translate(-2px,-2px); }
+	  50% { clip-path: inset(5% 0 85% 0); transform: translate(0,3px); }
+	  60% { clip-path: inset(80% 0 5% 0); transform: translate(2px,0); }
+	  70% { clip-path: inset(30% 0 60% 0); transform: translate(-1px,-1px); }
+	  80% { clip-path: inset(55% 0 30% 0); transform: translate(1px,2px); }
+	  90% { clip-path: inset(15% 0 70% 0); transform: translate(-3px,0); }
+	  100% { clip-path: inset(40% 0 61% 0); transform: translate(2px,-2px); }
+	}
+	.glitch-trigger { animation: glitch 0.3s ease-in-out; }
+	@keyframes gradientShift {
+	  0%,100% { background-position: 0% 50%; }
+	  50% { background-position: 100% 50%; }
+	}
 
 /* ============================================================
    Typography
@@ -999,6 +1040,9 @@ kbd {
 </style>
 </head>
 <body>
+n	<div id="three-container"></div>
+	<canvas id="particle-canvas"></canvas>
+	<div id="glow"></div>
 
 <!-- ============================================================
      NAVBAR — Glass-morphism, sticky top
@@ -1055,15 +1099,15 @@ kbd {
     </p>
     <div class="stats-row">
       <div class="stat">
-        <div class="number">21</div>
+        <div class="number" data-target="21">0</div>
         <div class="label">Tools</div>
       </div>
       <div class="stat">
-        <div class="number">6</div>
+        <div class="number" data-target="6">0</div>
         <div class="label">Categories</div>
       </div>
       <div class="stat">
-        <div class="number">5</div>
+        <div class="number" data-target="5">0</div>
         <div class="label">Setting Tabs</div>
       </div>
       <div class="stat">
@@ -2247,8 +2291,198 @@ had spent a lifetime chasing.</code></pre></div>
     fadeObserver.observe(el);
   });
 
-})();
 </script>
 
-</body>
-</html>
+})();
+	</script>
+
+	<!-- Three.js CDN -->
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+	<script>
+	/* 3D Scene — Torus Knot + Particles */
+	(function initThree() {
+	  var container = document.getElementById('three-container');
+	  var scene = new THREE.Scene();
+	  var camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+	  camera.position.set(0, 0, 10);
+	  var renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+	  renderer.setSize(window.innerWidth, window.innerHeight);
+	  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+	  renderer.setClearColor(0x0a0a0f, 1);
+	  container.appendChild(renderer.domElement);
+
+	  var knotGeo = new THREE.TorusKnotGeometry(1.2, 0.4, 128, 16);
+	  var knotMat = new THREE.MeshPhysicalMaterial({
+	    color: 0x00f5ff, emissive: 0x7b2ff7, emissiveIntensity: 0.6,
+	    roughness: 0.2, metalness: 0.8, transparent: true, opacity: 0.7, wireframe: false
+	  });
+	  var knot = new THREE.Mesh(knotGeo, knotMat);
+	  knot.position.y = 0.2;
+	  scene.add(knot);
+
+	  var wireMat = new THREE.MeshBasicMaterial({ color: 0x00f5ff, wireframe: true, transparent: true, opacity: 0.12 });
+	  var wireKnot = new THREE.Mesh(knotGeo.clone(), wireMat);
+	  wireKnot.position.y = 0.2;
+	  wireKnot.scale.set(1.06, 1.06, 1.06);
+	  scene.add(wireKnot);
+
+	  var rp1 = new THREE.BufferGeometry();
+	  var c1 = 600;
+	  var p1 = new Float32Array(c1 * 3);
+	  for (var i = 0; i < c1; i++) {
+	    var theta = Math.random() * Math.PI * 2;
+	    var phi = Math.acos(2 * Math.random() - 1);
+	    var r = 2.2 + 0.3 * Math.random();
+	    p1[i*3] = r * Math.sin(phi) * Math.cos(theta);
+	    p1[i*3+1] = r * Math.sin(phi) * Math.sin(theta);
+	    p1[i*3+2] = r * Math.cos(phi);
+	  }
+	  rp1.setAttribute('position', new THREE.BufferAttribute(p1, 3));
+	  var ring1 = new THREE.Points(rp1, new THREE.PointsMaterial({ color: 0x00f5ff, size: 0.03, transparent: true, opacity: 0.4, blending: THREE.AdditiveBlending, depthWrite: false }));
+	  scene.add(ring1);
+
+	  var sg = new THREE.BufferGeometry();
+	  var sc = 800;
+	  var sp = new Float32Array(sc * 3);
+	  for (var i = 0; i < sc * 3; i++) sp[i] = (Math.random() - 0.5) * 40;
+	  sg.setAttribute('position', new THREE.BufferAttribute(sp, 3));
+	  var stars = new THREE.Points(sg, new THREE.PointsMaterial({ color: 0xffffff, size: 0.04, transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending, depthWrite: false }));
+	  scene.add(stars);
+
+	  var mx = 0, my = 0, trx = 0, try2 = 0;
+	  document.addEventListener('mousemove', function(e) {
+	    mx = (e.clientX / window.innerWidth - 0.5) * 2;
+	    my = (e.clientY / window.innerHeight - 0.5) * 2;
+	  });
+	  window.addEventListener('resize', function() {
+	    camera.aspect = window.innerWidth / window.innerHeight;
+	    camera.updateProjectionMatrix();
+	    renderer.setSize(window.innerWidth, window.innerHeight);
+	  });
+
+	  function animate() {
+	    requestAnimationFrame(animate);
+	    trx += (my * 0.25 - trx) * 0.04;
+	    try2 += (mx * 0.25 - try2) * 0.04;
+	    var t = Date.now() * 0.0007;
+	    knot.rotation.x = t * 0.3 + trx;
+	    knot.rotation.y = t * 0.5 + try2;
+	    wireKnot.rotation.x = knot.rotation.x;
+	    wireKnot.rotation.y = knot.rotation.y;
+	    ring1.rotation.x = t * 0.08;
+	    ring1.rotation.y = t * 0.12;
+	    stars.rotation.y = t * 0.015;
+	    var pulse = 1 + Math.sin(t * 0.5) * 0.012;
+	    knot.scale.set(pulse, pulse, pulse);
+	    wireKnot.scale.set(pulse * 1.06, pulse * 1.06, pulse * 1.06);
+	    renderer.render(scene, camera);
+	  }
+	  animate();
+	})();
+	</script>
+
+	<script>
+	/* 2D Particle System */
+	(function initParticles() {
+	  var canvas = document.getElementById('particle-canvas');
+	  var ctx = canvas.getContext('2d');
+	  var w, h;
+	  function resize() { w = canvas.width = window.innerWidth; h = canvas.height = window.innerHeight; }
+	  resize();
+	  window.addEventListener('resize', resize);
+	  var particles = [], MAX = 55, mx = -999, my = -999;
+	  function create(x, y) {
+	    var a = Math.random() * Math.PI * 2;
+	    var s = 0.2 + Math.random() * 0.6;
+	    return { x:x, y:y, vx:Math.cos(a)*s, vy:Math.sin(a)*s, life:1, decay:0.01+Math.random()*0.014, size:1.5+Math.random()*3, hue: Math.random()<0.5?185:270 };
+	  }
+	  document.addEventListener('mousemove', function(e) {
+	    mx = e.clientX; my = e.clientY;
+	    for (var i = 0; i < 3; i++) { if (particles.length < MAX) particles.push(create(mx+(Math.random()-0.5)*8, my+(Math.random()-0.5)*8)); }
+	  });
+	  function draw() {
+	    ctx.clearRect(0, 0, w, h);
+	    for (var i = 0; i < 40; i++) {
+	      ctx.fillStyle = 'rgba(255,255,255,'+(0.015+Math.random()*0.03)+')';
+	      ctx.beginPath();
+	      ctx.arc((Math.sin(i*127.1+Date.now()*0.00008)+1)*w/2, (Math.cos(i*311.7+Date.now()*0.00006)+1)*h/2, 1+Math.random()*1.2, 0, Math.PI*2);
+	      ctx.fill();
+	    }
+	    for (var i = particles.length-1; i >= 0; i--) {
+	      var p = particles[i];
+	      p.x += p.vx; p.y += p.vy;
+	      p.vx *= 0.97; p.vy *= 0.97;
+	      p.life -= p.decay;
+	      if (p.life <= 0) { particles.splice(i,1); continue; }
+	      ctx.save();
+	      ctx.globalAlpha = p.life * 0.55;
+	      ctx.shadowColor = p.hue === 185 ? '#00f5ff' : '#7b2ff7';
+	      ctx.shadowBlur = 6;
+	      ctx.fillStyle = 'hsl('+p.hue+',100%,70%)';
+	      ctx.beginPath();
+	      ctx.arc(p.x, p.y, p.size*p.life, 0, Math.PI*2);
+	      ctx.fill();
+	      ctx.restore();
+	    }
+	    requestAnimationFrame(draw);
+	  }
+	  draw();
+	})();
+	</script>
+
+	<script>
+	/* Mouse Glow */
+	(function initGlow() {
+	  var glow = document.getElementById('glow');
+	  document.addEventListener('mousemove', function(e) {
+	    glow.style.left = e.clientX + 'px';
+	    glow.style.top = e.clientY + 'px';
+	    glow.style.opacity = '1';
+	  });
+	  document.addEventListener('mouseleave', function() { glow.style.opacity = '0'; });
+	})();
+	</script>
+
+	<script>
+	/* Counter Animation */
+	(function initCounters() {
+	  var observer = new IntersectionObserver(function(entries) {
+	    entries.forEach(function(entry) {
+	      if (entry.isIntersecting) {
+	        var el = entry.target;
+	        var target = el.getAttribute('data-target');
+	        if (!target || target === '∞') { observer.unobserve(el); return; }
+	        var end = parseInt(target);
+	        var dur = 1400;
+	        var start = performance.now();
+	        function update(now) {
+	          var p = Math.min((now - start) / dur, 1);
+	          var v = Math.floor(p < 1 ? (1 - Math.pow(2, -10 * p)) * end : end);
+	          el.textContent = v;
+	          if (p < 1) requestAnimationFrame(update);
+	          else el.textContent = end;
+	        }
+	        requestAnimationFrame(update);
+	        observer.unobserve(el);
+	      }
+	    });
+	  }, { threshold: 0.5 });
+	  document.querySelectorAll('.stat .number[data-target]').forEach(function(el) { observer.observe(el); });
+	})();
+	</script>
+
+	<script>
+	/* Title Glitch */
+	(function initGlitch() {
+	  var h1 = document.querySelector('.hero h1');
+	  if (!h1) return;
+	  h1.addEventListener('mouseenter', function() {
+	    h1.classList.add('glitch-trigger');
+	    setTimeout(function() { h1.classList.remove('glitch-trigger'); }, 350);
+	  });
+	})();
+	</script>
+
+	</body>
+	</html>
