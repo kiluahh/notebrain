@@ -5,7 +5,5 @@
   "minAppVersion": "1.7.0",
   "isDesktopOnly": false,
   "description": "AI Agent inside your notes. Press Mod+Shift+Enter to chat with DeepSeek directly in any note.",
-  "author": "kiluahh",
-  "authorUrl": "",
-  "fundingUrl": ""
+  "author": "kiluahh"
 }
