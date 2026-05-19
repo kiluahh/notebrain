@@ -1,0 +1,94 @@
+/* Chamberlain Settings */
+.notebrain-settings-toolbar {
+  display: flex;
+  gap: 0;
+  border-bottom: 2px solid var(--background-modifier-border);
+  margin-bottom: 20px;
+  padding-bottom: 0;
+}
+
+.notebrain-settings-tab {
+  padding: 8px 20px;
+  border: none;
+  background: none;
+  color: var(--text-muted);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.notebrain-settings-tab:hover {
+  color: var(--text-normal);
+}
+
+.notebrain-settings-tab.active {
+  color: var(--interactive-accent);
+  border-bottom-color: var(--interactive-accent);
+}
+
+.notebrain-settings-panel {
+  animation: notebrain-fadein 0.15s ease;
+}
+
+@keyframes notebrain-fadein {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Permission Modal */
+.notebrain-permission-modal {
+  padding: 8px;
+}
+
+.notebrain-permission-modal h3 {
+  margin: 0 0 16px 0;
+  color: var(--text-warning);
+}
+
+.notebrain-permission-info {
+  margin-bottom: 20px;
+  padding: 12px;
+  background: var(--background-secondary);
+  border-radius: 6px;
+}
+
+.notebrain-permission-info p {
+  margin: 4px 0;
+  word-break: break-all;
+}
+
+.notebrain-permission-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.notebrain-permission-deny {
+  padding: 8px 20px;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-secondary);
+  color: var(--text-muted);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.notebrain-permission-deny:hover {
+  background: var(--background-modifier-border);
+}
+
+.notebrain-permission-approve {
+  padding: 8px 20px;
+  border: none;
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.notebrain-permission-approve:hover {
+  opacity: 0.85;
+}
